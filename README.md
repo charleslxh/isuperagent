@@ -27,7 +27,7 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 
 支持 `中间件` 是 `ispueragent` 的最大特色，灵活的中间件能给开发者带来极大的便捷性、可操作性。
 
-洋葱模型出自 `NodeJS` 的 WEB 框架 [KOA](https://github.com/koajs/koa)，`isuperagent` 由参考该框架的中间件思想构成。
+洋葱模型出自 `NodeJS` 的 WEB 框架 [Koa](https://github.com/koajs/koa)，`isuperagent` 由参考该框架的中间件思想构成。
 
 参考资料：[洋葱模型](https://www.jianshu.com/p/dce0727002a6)。
 
