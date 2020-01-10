@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"ptapp.cn/util/isuperagent/bodyParser"
+	"isuperagent/bodyParser"
 )
 
 type RequestInterface interface {

@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"ptapp.cn/util/isuperagent"
+	"isuperagent"
 )
 
 // Middleware: send request

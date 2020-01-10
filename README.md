@@ -6,12 +6,18 @@ isuperagent 是一个通用、灵活的 HTTP CLIENT 库，包装了请求、响�
 
 ```go
 timeMiddleware, err := isuperagent.NewMiddleware("request_time")
-omsSniperAuthMiddleware, err := isuperagent.NewMiddleware("oms_sniper_auth", "MTIzNDU2", "YXNkZmdoamts")
+basicAuthMiddleware, err := isuperagent.NewMiddleware("basic_auth", "username", "password")
 debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx context.Context, req *isuperagent.Request) {
     log.Println(fmt.Sprintf("req headers: %+v", req.GetHeaders()))
 })
 
-res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(timeMiddleware, omsSniperAuthMiddleware, debugMiddleware).Do()
+res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(timeMiddleware, basicAuthMiddleware, debugMiddleware).Do()
+```
+
+## 安装
+
+```bash
+go get github.com/charleslxh/isuperagent
 ```
 
 ## 特性
@@ -47,7 +53,7 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 1. 在 `util/isuperagent/middleware` 目录下新建中间件的 go 文件。
 
     ```bash
-    $ touch src/ptapp.cn/util/isuperagent/middleware/xxxx.go 
+    $ touch your/path/xxxx_middleware.go 
     ```
 
 2. 自定义中间件必须实现 `isuperagent.MiddlewareInterface` 接口。
@@ -116,7 +122,7 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 3. 创建中间件实例。
 
     ```go
-    middleware, err := NewMiddleware("request_time")
+    middleware, err := isuperagent.NewMiddleware("request_time")
    	if err != nil {
    		return nil, err
    	}
@@ -129,7 +135,7 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 中间件的使用需要在初始化请求的时候（发送请求之前 `调用 Request.Do() 函数`）注册，具体参考以下代码：
 
 ```go
-res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(timeMiddleware, omsSniperAuthMiddleware, debugMiddleware).Do()
+res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(timeMiddleware, basicAuthMiddleware, debugMiddleware).Do()
 ```
 
 ### 解析器 BodyParser
@@ -145,7 +151,7 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 1. 在 `util/isuperagent/bodyParser` 目录下新建解析器的 go 文件。
 
     ```bash
-    $ touch src/ptapp.cn/util/isuperagent/bodyParser/xxxx.go
+    $ touch your/path/xxxx_parser.go
     ```
 
 2. 解析器必须实现 `bodyParser.BodyParserInterface` 接口。

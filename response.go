@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"ptapp.cn/util/isuperagent/bodyParser"
+	"isuperagent/bodyParser"
 )
 
 type ResponseInterface interface {

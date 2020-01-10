@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"ptapp.cn/util/isuperagent"
+	"isuperagent"
 )
 
 const X_SUPERAGENT_DURATION = "x-SuperAgent-Duration"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"ptapp.cn/util/isuperagent"
+	"isuperagent"
 )
 
 // Middleware: this middleware allow you to debug request information and response

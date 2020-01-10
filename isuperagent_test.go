@@ -10,10 +10,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
-	"ptapp.cn/util/isuperagent"
-	"ptapp.cn/util/isuperagent/middleware"
+	"isuperagent"
+	"isuperagent/middleware"
 )
 
 type ResponseData struct {
