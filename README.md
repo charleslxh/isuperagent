@@ -36,9 +36,9 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 用户调用时，发起请求之前（调用 `.Do()` 为发起请求）用户可以通过 `Middleware` 函数注册中间件，中间件的请求调用顺序（在发送请求之前）与注册时的顺序一致，
 中间件的响应调用顺序（在返回结果之前）与注册时的顺序相反，具体链路如下：
 
-![洋葱模型](https://upload-images.jianshu.io/upload_images/9566895-a1d3c5a8db4a088d.png?imageMogr2/auto-orient/strip|imageView2/2/w/540/format/webp)
-
 `发起请求 -> middleware A -> middleware B -> 请求服务器 -> middleware B -> middleware A -> 返回响应`
+
+![洋葱模型](https://github.com/charleslxh/isuperagent/blob/master/middleware.png)
 
 **注意：请求响应和错误需要中间件一层一层的向上返回，如果中间某个中间件没有返回，则响应会被该中间价吞噬，错误也会被隐藏。**
 
