@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"isuperagent/bodyParser"
+	"github.com/charleslxh/isuperagent/bodyParser"
 )
 
 type RequestInterface interface {

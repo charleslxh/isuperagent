@@ -10,8 +10,10 @@ import (
 	"runtime"
 	"testing"
 
-	"isuperagent"
-	"isuperagent/middleware"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/charleslxh/isuperagent"
+	"github.com/charleslxh/isuperagent/middleware"
 )
 
 type ResponseData struct {
@@ -20,7 +22,7 @@ type ResponseData struct {
 	Data map[string]interface{} `json:"data"`
 }
 
-func MockHttp(ast *assert.Assertions, close <-chan struct{}) {
+func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 	http.HandleFunc("/v1/getQuery", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Server", runtime.Version())
@@ -82,7 +84,7 @@ func MockHttp(ast *assert.Assertions, close <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/v1", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -92,16 +94,22 @@ func MockHttp(ast *assert.Assertions, close <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	err := http.ListenAndServe(":28080", nil)
-	ast.Nil(err)
+	srv := http.Server{Addr: ":28080"}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Println("Mock HTTP shutdown")
+		}
+	}()
 
-	log.Println("Mock HTTP server started on 28080")
+	log.Println("Mock HTTPS server started on 28080")
 
-	<-close
+	<-ch
+
+	_ = srv.Shutdown(nil)
 }
 
-func MockHttps(ast *assert.Assertions, close <-chan struct{}) {
-	http.HandleFunc("/v1/echo", func(w http.ResponseWriter, r *http.Request) {
+func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
+	http.HandleFunc("/v2/echo", func(w http.ResponseWriter, r *http.Request) {
 		bs, err := ioutil.ReadAll(r.Body)
 		ast.Nil(err)
 		ast.Equal("POST", r.Method)
@@ -114,7 +122,7 @@ func MockHttps(ast *assert.Assertions, close <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/v2", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -124,12 +132,18 @@ func MockHttps(ast *assert.Assertions, close <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	err := http.ListenAndServeTLS("localhost:2443", "./cert/cert.pem", "./cert/key.pem", nil)
-	ast.Nil(err)
+	srv := http.Server{Addr: ":2443"}
+	go func() {
+		if err := srv.ListenAndServeTLS("./cert/cert.pem", "./cert/key.pem"); err != nil {
+			log.Println("Mock HTTPS shutdown")
+		}
+	}()
 
 	log.Println("Mock HTTPS server started on 2443")
 
-	<-close
+	<-ch
+
+	_ = srv.Shutdown(nil)
 }
 
 func startServer(ast *assert.Assertions, https bool) chan<- struct{} {
@@ -254,11 +268,11 @@ func TestSuperAgent_HttpsRequest(t *testing.T) {
 	// -------------------
 	// 请求自签名证书
 	// -------------------
-	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").Do()
+	res, err = isuperagent.NewRequest().Get("https://localhost:2443/v2").Do()
 	ast.NotNil(err)
-	ast.Equal("Get https://localhost:2443/: x509: certificate signed by unknown authority", err.Error())
+	ast.Equal("Get https://localhost:2443/v2: x509: certificate signed by unknown authority", err.Error())
 
-	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").InsecureSkipVerify(true).Do()
+	res, err = isuperagent.NewRequest().Get("https://localhost:2443/v2").InsecureSkipVerify(true).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.StatusCode)
 	ast.True(res.IsOk())
@@ -285,7 +299,7 @@ func TestSuperAgent_RequestTimeMiddleware(t *testing.T) {
 	timeMiddleware, err = isuperagent.NewMiddleware("request_time")
 	ast.Nil(err)
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/").Middleware(timeMiddleware).Do()
+	res, err := isuperagent.NewRequest().Get("http://localhost:28080/v2").Middleware(timeMiddleware).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.StatusCode)
 	ast.True(res.IsOk())
@@ -326,12 +340,12 @@ func TestSuperAgent_Middleware(t *testing.T) {
 
 	debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx context.Context, req *isuperagent.Request) {
 		ast.Equal(isuperagent.Method_GET, req.GetMethod())
-		ast.NotEqual(0, len(req.GetHeader(middleware.OMS_SNIPER_HEADER)))
+		ast.NotEqual(0, len(req.GetHeader(middleware.BASIC_AUTH_HEADER)))
 		log.Println(fmt.Sprintf("req headers: %+v", req.GetHeaders()))
 	})
 	ast.Nil(err)
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/").
+	res, err := isuperagent.NewRequest().Get("http://localhost:28080/v2").
 		Middleware(timeMiddleware, omsSniperAuthMiddleware, debugMiddleware).
 		Do()
 	ast.Nil(err)

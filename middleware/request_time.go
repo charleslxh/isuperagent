@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"isuperagent"
+	"github.com/charleslxh/isuperagent"
 )
 
 const X_SUPERAGENT_DURATION = "x-SuperAgent-Duration"

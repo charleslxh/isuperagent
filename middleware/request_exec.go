@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"isuperagent"
+	"github.com/charleslxh/isuperagent"
 )
 
 // Middleware: send request

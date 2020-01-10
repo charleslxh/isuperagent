@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"isuperagent/bodyParser"
+	"github.com/charleslxh/isuperagent/bodyParser"
 )
 
 type ResponseInterface interface {

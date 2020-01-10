@@ -1,6 +1,8 @@
 package bodyParser
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type JsonParser struct{}
 
