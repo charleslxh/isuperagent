@@ -1,5 +1,7 @@
 # isuperagent
 
+[![Build Status](https://travis-ci.org/charleslxh/isuperagent.svg?branch=master)](https://travis-ci.org/charleslxh/isuperagent)
+
 isuperagent 是一个通用、灵活的 HTTP CLIENT 库，包装了请求、响应参数。提供了灵活的属性，支持自定义 parser、支持组件（洋葱模型）、链式调用等特性。 
 
 ## 示例
