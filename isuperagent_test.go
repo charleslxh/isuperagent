@@ -23,7 +23,9 @@ type ResponseData struct {
 }
 
 func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
-	http.HandleFunc("/v1/getQuery", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/v1/getQuery", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -42,7 +44,7 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/v1/getHeader", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/getHeader", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -61,7 +63,7 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/v1/getHtml", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/getHtml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -71,7 +73,7 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/v1/echo", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/echo", func(w http.ResponseWriter, r *http.Request) {
 		bs, err := ioutil.ReadAll(r.Body)
 		ast.Nil(err)
 		ast.Equal("POST", r.Method)
@@ -94,7 +96,7 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	srv := http.Server{Addr: ":28080"}
+	srv := http.Server{Addr: ":28080", Handler: mux}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			log.Println("Mock HTTP shutdown")
@@ -109,7 +111,9 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 }
 
 func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
-	http.HandleFunc("/v2/echo", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/v2/echo", func(w http.ResponseWriter, r *http.Request) {
 		bs, err := ioutil.ReadAll(r.Body)
 		ast.Nil(err)
 		ast.Equal("POST", r.Method)
@@ -122,7 +126,7 @@ func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	http.HandleFunc("/v2", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v2", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("X-Server", runtime.Version())
 		w.WriteHeader(200)
@@ -132,7 +136,7 @@ func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	srv := http.Server{Addr: ":2443"}
+	srv := http.Server{Addr: ":2443", Handler: mux}
 	go func() {
 		if err := srv.ListenAndServeTLS("./cert/cert.pem", "./cert/key.pem"); err != nil {
 			log.Println("Mock HTTPS shutdown")
