@@ -75,6 +75,10 @@ type Request struct {
 	body    interface{}
 	bodyRaw []byte
 
+	// Basic Auth
+	username string
+	password string
+
 	middleware []MiddlewareInterface
 }
 
@@ -337,6 +341,28 @@ func (r *Request) Ca(caPath string) *Request {
 
 func (r *Request) GetCa() string {
 	return r.ca
+}
+
+// Set username for basic auth.
+func (r *Request) Username(username string) *Request {
+	r.username = username
+
+	return r
+}
+
+func (r *Request) GetUsername() string {
+	return r.username
+}
+
+// Set password for basic auth.
+func (r *Request) Password(password string) *Request {
+	r.password = password
+
+	return r
+}
+
+func (r *Request) GetPassword() string {
+	return r.password
 }
 
 // Ignore verify the self-signed certificate.

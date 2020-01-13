@@ -61,6 +61,11 @@ func (m *ExecRequestMiddleware) Run(ctx context.Context, r *isuperagent.Request,
 		Timeout: r.GetTimeout(),
 	}
 
+	// Set basic auth
+	if r.GetUsername() != "" && r.GetPassword() != "" {
+		req.SetBasicAuth(r.GetUsername(), r.GetPassword())
+	}
+
 	// set https options
 	if r.IsHttps() {
 		tr := &http.Transport{}
