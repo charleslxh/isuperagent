@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -40,7 +39,7 @@ func RegisterMiddlewareFactory(name string, factory MiddlewareFactory) {
 
 // Composer all middleware
 // Return the start middleware
-func Compose(ctx Context, middleware []Middleware) func(ctx Context) error {
+func Compose(ctx Context, middleware []Middleware) func() error {
 	i := 0
 	var next Next
 	next = func() error {
@@ -56,7 +55,7 @@ func Compose(ctx Context, middleware []Middleware) func(ctx Context) error {
 		return middleware[i](ctx, next)
 	}
 
-	return func(ctx Context) error {
+	return func() error {
 		return middleware[i](ctx, next)
 	}
 }
@@ -123,16 +122,16 @@ func NewBasicAuthMiddlewareFactory(v ...interface{}) (Middleware, error) {
 
 	var username, password string
 
-	if v, ok := v[0].(string); !ok {
+	if user, ok := v[0].(string); !ok {
 		return nil, errors.New(fmt.Sprintf("excepted username is string, but got %v(%s)", v[0], reflect.TypeOf(v[0])))
 	} else {
-		username = v
+		username = user
 	}
 
-	if v, ok := v[1].(string); !ok {
-		return nil, errors.New(fmt.Sprintf("excepted password is string, but got %v(%s)", v[0], reflect.TypeOf(v[0])))
+	if pass, ok := v[1].(string); !ok {
+		return nil, errors.New(fmt.Sprintf("excepted password is string, but got %v(%s)", v[1], reflect.TypeOf(v[1])))
 	} else {
-		password = v
+		password = pass
 	}
 
 	return func(ctx Context, next Next) error {
@@ -227,7 +226,6 @@ func NewRequestExecMiddlewareFactory(v ...interface{}) (Middleware, error) {
 		// Do request, retry it again if failed
 		var resp *http.Response
 		var e error
-		log.Println(">>>>>>>>>>>>>", r.GetRetry(), r.GetRawUrl())
 		if r.GetRetry() > 0 {
 			for times := 0; times < r.GetRetry(); times++ {
 				resp, e = c.Do(req)
@@ -240,7 +238,7 @@ func NewRequestExecMiddlewareFactory(v ...interface{}) (Middleware, error) {
 			resp, e = c.Do(req)
 		}
 		if e != nil {
-			return err
+			return e
 		}
 
 		res, err := NewResponse(req, resp)

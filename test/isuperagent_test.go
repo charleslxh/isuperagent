@@ -20,7 +20,7 @@ type ResponseData struct {
 	Data map[string]interface{} `json:"data"`
 }
 
-func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
+func MockHttp(ast *assert.Assertions, port int, ch <-chan struct{}) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/getQuery", func(w http.ResponseWriter, r *http.Request) {
@@ -94,21 +94,21 @@ func MockHttp(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	srv := http.Server{Addr: ":28080", Handler: mux}
+	srv := http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			log.Println("Mock HTTP shutdown")
 		}
 	}()
 
-	log.Println("Mock HTTPS server started on 28080")
+	log.Println(fmt.Sprintf("Mock HTTPS server started on %d", port))
 
 	<-ch
 
 	_ = srv.Shutdown(nil)
 }
 
-func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
+func MockHttps(ast *assert.Assertions, port int, ch <-chan struct{}) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
@@ -134,27 +134,27 @@ func MockHttps(ast *assert.Assertions, ch <-chan struct{}) {
 		ast.Nil(err)
 	})
 
-	srv := http.Server{Addr: ":2443", Handler: mux}
+	srv := http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
 	go func() {
-		if err := srv.ListenAndServeTLS("./cert/cert.pem", "./cert/key.pem"); err != nil {
+		if err := srv.ListenAndServeTLS("../cert/cert.pem", "../cert/key.pem"); err != nil {
 			log.Println("Mock HTTPS shutdown")
 		}
 	}()
 
-	log.Println("Mock HTTPS server started on 2443")
+	log.Println(fmt.Sprintf("Mock HTTPS server started on %d", port))
 
 	<-ch
 
 	_ = srv.Shutdown(nil)
 }
 
-func startServer(ast *assert.Assertions, https bool) chan<- struct{} {
+func startServer(ast *assert.Assertions, port int, https bool) chan<- struct{} {
 	ch := make(chan struct{})
 
 	if https {
-		go MockHttps(ast, ch)
+		go MockHttps(ast, port, ch)
 	} else {
-		go MockHttp(ast, ch)
+		go MockHttp(ast, port, ch)
 	}
 
 	return ch
@@ -163,7 +163,8 @@ func startServer(ast *assert.Assertions, https bool) chan<- struct{} {
 func TestSuperAgent_Request(t *testing.T) {
 	ast := assert.New(t)
 
-	ch := startServer(ast, false)
+	port := 28080
+	ch := startServer(ast, port, false)
 	defer close(ch)
 
 	// -----------------
@@ -175,8 +176,8 @@ func TestSuperAgent_Request(t *testing.T) {
 		"c": "3",
 	}
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/getQuery").SetQueries(queries).Do()
-
+	url := fmt.Sprintf("http://localhost:%d/getQuery", port)
+	res, err := isuperagent.NewRequest().Get(url).SetQueries(queries).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -205,7 +206,8 @@ func TestSuperAgent_Request(t *testing.T) {
 		"cookie":          "_ga=GA1.2.242301321.1564383471; __utmc=110886291; __utmz=110886291.1578538723.31.21.utmcsr=google|utmccn=(organic)|utmcmd=organic|utmctr=(not%20provided); __utma=110886291.242301321.1564383471.1578538723.1578565071.32",
 		"user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36",
 	}
-	res, err = isuperagent.NewRequest().Get("http://localhost:28080/getHeader").SetHeaders(headers).Do()
+	url = fmt.Sprintf("http://localhost:%d/getHeader", port)
+	res, err = isuperagent.NewRequest().Get(url).SetHeaders(headers).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -227,7 +229,8 @@ func TestSuperAgent_Request(t *testing.T) {
 	// -----------------
 	// 验证 POST 请求
 	// -----------------
-	res, err = isuperagent.NewRequest().Post("http://localhost:28080/echo").SetBody("Hello World").Do()
+	url = fmt.Sprintf("http://localhost:%d/echo", port)
+	res, err = isuperagent.NewRequest().Post(url).SetBody("Hello World").Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -237,7 +240,8 @@ func TestSuperAgent_Request(t *testing.T) {
 	ast.Nil(err)
 	ast.Equal("Hello World", data3)
 
-	res, err = isuperagent.NewRequest().Post("http://localhost:28080/echo", "Hello World Golang").Do()
+	url = fmt.Sprintf("http://localhost:%d/echo", port)
+	res, err = isuperagent.NewRequest().Post(url, "Hello World Golang").Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -251,7 +255,8 @@ func TestSuperAgent_Request(t *testing.T) {
 func TestSuperAgent_HttpsRequest(t *testing.T) {
 	ast := assert.New(t)
 
-	ch := startServer(ast, true)
+	port := 28081
+	ch := startServer(ast, port, true)
 	defer close(ch)
 
 	// -------------------
@@ -270,11 +275,12 @@ func TestSuperAgent_HttpsRequest(t *testing.T) {
 	// -------------------
 	// 请求自签名证书
 	// -------------------
-	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").Do()
+	url := fmt.Sprintf("https://localhost:%d/", port)
+	res, err = isuperagent.NewRequest().Get(url).Do()
 	ast.NotNil(err)
-	ast.Equal("Get https://localhost:2443/: x509: certificate signed by unknown authority", err.Error())
+	ast.Equal(fmt.Sprintf("Get https://localhost:%d/: x509: certificate signed by unknown authority", port), err.Error())
 
-	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").SetInsecureSkipVerify(true).Do()
+	res, err = isuperagent.NewRequest().Get(url).SetInsecureSkipVerify(true).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -290,18 +296,15 @@ func TestSuperAgent_HttpsRequest(t *testing.T) {
 func TestSuperAgent_RequestTimeMiddleware(t *testing.T) {
 	ast := assert.New(t)
 
-	ch := startServer(ast, false)
+	port := 28082
+	ch := startServer(ast, port, false)
 	defer close(ch)
 
-	timeMiddleware, err := isuperagent.NewMiddleware("request_time", 1)
-	ast.NotNil(err)
-	ast.Nil(timeMiddleware)
-	ast.Equal("excepted header_name is string, but got 1(int)", err.Error())
-
-	timeMiddleware, err = isuperagent.NewMiddleware("request_time")
+	timeMiddleware, err := isuperagent.NewMiddleware("request_time")
 	ast.Nil(err)
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/").Middleware(timeMiddleware).Do()
+	url := fmt.Sprintf("http://localhost:%d/", port)
+	res, err := isuperagent.NewRequest().Get(url).Middleware(timeMiddleware).Do()
 	ast.Nil(err)
 	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
@@ -316,7 +319,8 @@ func TestSuperAgent_RequestTimeMiddleware(t *testing.T) {
 func TestSuperAgent_Middleware(t *testing.T) {
 	ast := assert.New(t)
 
-	ch := startServer(ast, false)
+	port := 28083
+	ch := startServer(ast, port, false)
 	defer close(ch)
 
 	nonExistsMiddleware, err := isuperagent.NewMiddleware("non_exists")
@@ -347,7 +351,8 @@ func TestSuperAgent_Middleware(t *testing.T) {
 	})
 	ast.Nil(err)
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/").
+	url := fmt.Sprintf("http://localhost:%d", port)
+	res, err := isuperagent.NewRequest().Get(url).
 		Middleware(timeMiddleware, basicAuthMiddleware, debugMiddleware).
 		Do()
 	ast.Nil(err)

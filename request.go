@@ -168,8 +168,18 @@ func (r *irequest) GetMethod() string {
 }
 
 // Set request URL
-func (r *irequest) SetUrl(url string) Request {
-	// TODO: ... ...
+func (r *irequest) SetUrl(uri string) Request {
+	urlObj, _ := url.Parse(uri)
+
+	// parse query
+	for k, vs := range urlObj.Query() {
+		for _, v := range vs {
+			r.SetQuery(k, v)
+		}
+	}
+
+	r.Url.URL = urlObj
+
 	return r
 }
 
@@ -445,7 +455,7 @@ func (r *irequest) Do() (Response, error) {
 
 	middleware := append(r.Middlewares, m)
 
-	err = Compose(ctx, middleware)(ctx)
+	err = Compose(ctx, middleware)()
 	if err != nil {
 		return nil, err
 	}

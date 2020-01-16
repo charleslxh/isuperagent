@@ -19,5 +19,5 @@ func NewURL() *URL {
 func (u *URL) String() string {
 	u.RawQuery = u.Queries.Encode()
 
-	return u.String()
+	return u.URL.String()
 }
