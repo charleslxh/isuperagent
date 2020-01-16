@@ -11,75 +11,97 @@ import (
 	"github.com/charleslxh/isuperagent/bodyParser"
 )
 
-type RequestInterface interface {
-	Method(method string) *Request
-	Get(url string) *Request
-	Post(url string) *Request
-	Head(url string) *Request
-	Put(url string) *Request
-	Update(url string) *Request
-	Delete(url string) *Request
+type Request interface {
+	SetMethod(method string, options ...interface{}) Request
+	GetMethod() string
 
-	Url(url string) *Request
+	Get(url string, options ...interface{}) Request
+	Post(url string, options ...interface{}) Request
+	Head(url string, options ...interface{}) Request
+	Put(url string, options ...interface{}) Request
+	Update(url string, options ...interface{}) Request
+	Delete(url string, options ...interface{}) Request
 
-	Header(name, value string) *Request
-	Headers(map[string]string) *Request
+	SetUrl(url string) Request
+	GetUrl() *URL
+	GetRawUrl() string
 
-	Query(name string, value string) *Request
-	Queries(map[string]string) *Request
+	GetHeader(name string) string
+	SetHeader(name, value string) Request
+	GetHeaders() http.Header
+	SetHeaders(kv map[string]string) Request
 
-	Body(v interface{}) *Request
+	SetContentType(contentType string) Request
 
-	Timeout(d time.Duration) *Request
-	Retry(times int) *Request
+	GetQuery(name string) string
+	SetQuery(name string, value string) Request
+	GetQueries() url.Values
+	SetQueries(kv map[string]string) Request
 
-	Cert(certPath string) *Request
-	Key(keyPath string) *Request
-	BasicAuth(name, pass string) *Request
+	SetBody(v interface{}) Request
+	GetBody() interface{}
+	GetBodyRaw() ([]byte, error)
 
-	Context(ctx context.Context) *Request
+	SetTimeout(d time.Duration) Request
+	GetTimeout() time.Duration
+	SetRetry(times int) Request
+	GetRetry() int
 
-	Middleware(middleware ...MiddlewareInterface) *Request
+	SetInsecureSkipVerify(insecureSkipVerify bool) Request
+	GetInsecureSkipVerify() bool
+	SetTlsConfig(tlsConfig *tls.Config) Request
+	GetTlsConfig() *tls.Config
+	SetCa(caPath string) Request
+	GetCa() string
+	SetCert(certPath, keyPath string) Request
+	GetCert() (string, string)
+	BasicAuth(name, pass string) Request
+	GetUsername() string
+	GetPassword() string
 
-	Do() (*Response, error)
+	SetContext(ctx context.Context) Request
+
+	Middleware(middleware ...Middleware) Request
+
+	Do() (Response, error)
 }
 
-type Request struct {
-	ctx         context.Context
-	host        string
-	method      string
-	url         string
-	contentType string
-	timeout     time.Duration
-	retry       int
+type irequest struct {
+	Context context.Context
 
-	headers http.Header
-	queries url.Values
+	Method string
+	Url    *URL
+
+	ContentType ContentType
+	Timeout     time.Duration
+	Retry       int
+
+	Headers http.Header
 
 	// Optionally override the trusted CA certificates.
 	// Default is to trust the well-known CAs curated by Mozilla
-	ca string
+	Ca string
 	// Cert chains in PEM format.
 	// One cert chain should be provided per private key
-	cert string
+	Cert string
 	// Private keys in PEM format.
 	// PEM allows the option of private keys being encrypted
-	key string
+	Key string
 	// If false, the server certificate is verified against the list of supplied CAs.
 	// An 'error' event is emitted if verification fails; err.code contains the OpenSSL error code.
 	// Default: false.
-	insecureSkipVerify bool
+	InsecureSkipVerify bool
 
-	tlsConfig *tls.Config
+	TlsConfig *tls.Config
 
-	body    interface{}
-	bodyRaw []byte
+	Body    interface{}
+	BodyRaw []byte
 
 	// Basic Auth
-	username string
-	password string
+	Username string
+	Password string
 
-	middleware []MiddlewareInterface
+	Middlewares []Middleware
 }
 
 const (
@@ -91,16 +113,16 @@ const (
 	Method_DELETE = "DELETE"
 )
 
-func NewRequest() *Request {
-	return &Request{ctx: context.Background(), queries: url.Values{}, headers: http.Header{}}
+func NewRequest() Request {
+	return &irequest{Context: context.Background(), Url: NewURL(), Headers: http.Header{}}
 }
 
-func NewRequestWithContext(ctx context.Context) *Request {
-	return &Request{ctx: ctx, queries: url.Values{}, headers: http.Header{}}
+func NewRequestWithContext(ctx context.Context) Request {
+	return &irequest{Context: ctx, Url: NewURL(), Headers: http.Header{}}
 }
 
-func (r *Request) Context(ctx context.Context) *Request {
-	r.ctx = ctx
+func (r *irequest) SetContext(ctx context.Context) Request {
+	r.Context = ctx
 
 	return r
 }
@@ -113,63 +135,69 @@ func (r *Request) Context(ctx context.Context) *Request {
 // 2. Set request body if second options exists.
 // 3. Set request headers if third options exists, it must be map[string]string type, ignore is otherwise.
 // 4. Set request queries if fourth options exists, it must be map[string]string type, ignore is otherwise.
-func (r *Request) Method(method string, options ...interface{}) *Request {
-	r.method = strings.ToUpper(method)
+func (r *irequest) SetMethod(method string, options ...interface{}) Request {
+	r.Method = strings.ToUpper(method)
 
 	if len(options) > 0 {
 		if v, ok := options[0].(string); ok {
-			r.Url(v)
+			r.SetUrl(v)
 		}
 	}
 
 	if len(options) > 1 {
-		r.Body(options[1])
+		r.SetBody(options[1])
 	}
 
 	if len(options) > 2 {
 		if v, ok := options[2].(map[string]string); ok {
-			r.Headers(v)
+			r.SetHeaders(v)
 		}
 	}
 
 	if len(options) > 3 {
 		if v, ok := options[3].(map[string]string); ok {
-			r.Queries(v)
+			r.SetQueries(v)
 		}
 	}
 
 	return r
 }
 
-func (r *Request) GetMethod() string {
-	return r.method
+func (r *irequest) GetMethod() string {
+	return r.Method
 }
 
 // Set request URL
-func (r *Request) Url(url string) *Request {
-	r.url = url
-
+func (r *irequest) SetUrl(url string) Request {
+	// TODO: ... ...
 	return r
 }
 
-func (r *Request) GetUrl() string {
-	return r.url
+func (r *irequest) GetUrl() *URL {
+	return r.Url
+}
+
+func (r *irequest) GetRawUrl() string {
+	return r.Url.String()
 }
 
 // Set request Host
-func (r *Request) Host(host string) *Request {
-	r.host = host
+func (r *irequest) Host(host string) Request {
+	r.Url.Host = host
 
 	return r
 }
 
-func (r *Request) GetHost() string {
-	return r.host
+func (r *irequest) GetHost() string {
+	return r.Url.Host
 }
 
 // Set request method to GET and request URL
-func (r *Request) Get(url string) *Request {
-	r.Method(Method_GET, url)
+// The options same as POST method.
+// But body fields is nil.
+func (r *irequest) Get(url string, options ...interface{}) Request {
+	options = append([]interface{}{url, nil}, options...)
+	r.SetMethod(Method_GET, url)
 
 	return r
 }
@@ -181,139 +209,148 @@ func (r *Request) Get(url string) *Request {
 // 1. Set request body if first options exists.
 // 2. Set request headers if second options exists, it must be map[string]string type, ignore is otherwise.
 // 3. Set request queries if third options exists, it must be map[string]string type, ignore is otherwise.
-func (r *Request) Post(url string, options ...interface{}) *Request {
+func (r *irequest) Post(url string, options ...interface{}) Request {
 	options = append([]interface{}{url}, options...)
-	r.Method(Method_POST, options...)
+	r.SetMethod(Method_POST, options...)
 
 	return r
 }
 
 // Set request method to HEAD and request URL
-func (r *Request) Head(url string) *Request {
-	r.Method(Method_HEAD, url)
+// The options same as POST method.
+// But body fields is nil.
+func (r *irequest) Head(url string, options ...interface{}) Request {
+	options = append([]interface{}{url, nil}, options...)
+	r.SetMethod(Method_HEAD, url)
 
 	return r
 }
 
 // Set Put options, url, method, query string, body, header
 // The options same as POST method.
-func (r *Request) Put(url string, options ...interface{}) *Request {
+func (r *irequest) Put(url string, options ...interface{}) Request {
 	options = append([]interface{}{url}, options...)
-	r.Method(Method_PUT, options...)
+	r.SetMethod(Method_PUT, options...)
 
 	return r
 }
 
 // Set Update options, url, method, query string, body, header
 // The options same as POST method.
-func (r *Request) Update(url string, options ...interface{}) *Request {
+func (r *irequest) Update(url string, options ...interface{}) Request {
 	options = append([]interface{}{url}, options...)
-	r.Method(Method_UPDATE, options...)
+	r.SetMethod(Method_UPDATE, options...)
 
 	return r
 }
 
 // Set request method to HEAD and request URL
-func (r *Request) Delete(url string) *Request {
-	r.Method(Method_DELETE, url)
+// The options same as POST method.
+// But body fields is nil.
+func (r *irequest) Delete(url string, options ...interface{}) Request {
+	options = append([]interface{}{url, nil}, options...)
+	r.SetMethod(Method_DELETE, url)
 
 	return r
 }
 
-func (r *Request) Header(name, value string) *Request {
-	r.headers.Add(name, value)
+func (r *irequest) SetHeader(name, value string) Request {
+	r.Headers.Add(name, value)
 
 	return r
 }
 
-func (r *Request) GetHeader(name string) string {
-	return r.headers.Get(name)
+func (r *irequest) GetHeader(name string) string {
+	return r.Headers.Get(name)
 }
 
-func (r *Request) Headers(kvs map[string]string) *Request {
+func (r *irequest) SetHeaders(kvs map[string]string) Request {
 	for k, v := range kvs {
-		r.Header(k, v)
+		r.SetHeader(k, v)
 	}
 
 	return r
 }
 
-func (r *Request) GetHeaders() http.Header {
-	return r.headers
+func (r *irequest) GetHeaders() http.Header {
+	return r.Headers
 }
 
-func (r *Request) Query(name, value string) *Request {
-	r.queries.Add(name, value)
+func (r *irequest) SetQuery(name, value string) Request {
+	r.Url.Queries.Add(name, value)
 
 	return r
 }
 
-func (r *Request) GetQuery(name string) string {
-	return r.queries.Get(name)
+func (r *irequest) GetQuery(name string) string {
+	if v := r.Url.Queries.Get(name); v != "" {
+		return v
+	}
+
+	return r.Url.Query().Get(name)
 }
 
-func (r *Request) Queries(kvs map[string]string) *Request {
+func (r *irequest) SetQueries(kvs map[string]string) Request {
 	for k, v := range kvs {
-		r.Query(k, v)
+		r.SetQuery(k, v)
 	}
 
 	return r
 }
 
-func (r *Request) GetQueries() url.Values {
-	return r.queries
+func (r *irequest) GetQueries() url.Values {
+	return r.Url.Queries
 }
 
-func (r *Request) ContentType(contentType string) *Request {
-	r.Header("Content-Type", contentType)
-	r.contentType = contentType
+func (r *irequest) SetContentType(contentType string) Request {
+	r.ContentType = ParseContentType(contentType)
 
 	return r
 }
 
-func (r *Request) Timeout(d time.Duration) *Request {
-	r.timeout = d
+func (r *irequest) SetTimeout(d time.Duration) Request {
+	r.Timeout = d
 
 	return r
 }
 
-func (r *Request) GetTimeout() time.Duration {
-	return r.timeout
+func (r *irequest) GetTimeout() time.Duration {
+	return r.Timeout
 }
 
-func (r *Request) Retry(times int) *Request {
-	r.retry = times
+func (r *irequest) SetRetry(times int) Request {
+	r.Retry = times
 
 	return r
 }
 
-func (r *Request) GetRetry() int {
-	return r.retry
+func (r *irequest) GetRetry() int {
+	return r.Retry
 }
 
-func (r *Request) IsHttps() bool {
-	return strings.HasPrefix(r.url, "https")
+func (r *irequest) IsHttps() bool {
+	return "https" == r.Url.Scheme
 }
 
-func (r *Request) Middleware(middleware ...MiddlewareInterface) *Request {
-	r.middleware = append(r.middleware, middleware...)
+func (r *irequest) Middleware(middleware ...Middleware) Request {
+	r.Middlewares = append(r.Middlewares, middleware...)
 
 	return r
 }
 
-func (r *Request) Body(v interface{}) *Request {
-	r.body = v
+func (r *irequest) SetBody(v interface{}) Request {
+	r.Body = v
 
 	return r
 }
 
-func (r *Request) GetBody() interface{} {
-	return r.body
+func (r *irequest) GetBody() interface{} {
+	return r.Body
 }
 
-func (r *Request) GetBodyRaw() ([]byte, error) {
+func (r *irequest) GetBodyRaw() ([]byte, error) {
 	// generate request body
-	requestBody, err := bodyParser.Marshal(r.contentType, r.body)
+	requestBody, err := bodyParser.Marshal(r.ContentType.MediaType, r.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -321,48 +358,55 @@ func (r *Request) GetBodyRaw() ([]byte, error) {
 	return requestBody, nil
 }
 
-func (r *Request) Cert(certPath, keyPath string) *Request {
-	r.cert = certPath
-	r.key = keyPath
+func (r *irequest) SetCert(certPath, keyPath string) Request {
+	r.Cert = certPath
+	r.Key = keyPath
 
 	return r
 }
 
-func (r *Request) GetCert() (string, string) {
-	return r.cert, r.key
+func (r *irequest) GetCert() (string, string) {
+	return r.Cert, r.Key
 }
 
 // Set server root certificate.
-func (r *Request) Ca(caPath string) *Request {
-	r.ca = caPath
+func (r *irequest) SetCa(caPath string) Request {
+	r.Ca = caPath
 
 	return r
 }
 
-func (r *Request) GetCa() string {
-	return r.ca
+func (r *irequest) GetCa() string {
+	return r.Ca
+}
+
+func (r *irequest) BasicAuth(user, pass string) Request {
+	r.Username = user
+	r.Password = pass
+
+	return r
 }
 
 // Set username for basic auth.
-func (r *Request) Username(username string) *Request {
-	r.username = username
+func (r *irequest) SetUsername(username string) Request {
+	r.Username = username
 
 	return r
 }
 
-func (r *Request) GetUsername() string {
-	return r.username
+func (r *irequest) GetUsername() string {
+	return r.Username
 }
 
 // Set password for basic auth.
-func (r *Request) Password(password string) *Request {
-	r.password = password
+func (r *irequest) SetPassword(password string) Request {
+	r.Password = password
 
 	return r
 }
 
-func (r *Request) GetPassword() string {
-	return r.password
+func (r *irequest) GetPassword() string {
+	return r.Password
 }
 
 // Ignore verify the self-signed certificate.
@@ -370,34 +414,41 @@ func (r *Request) GetPassword() string {
 // The request connection will failed with error:
 //		x509: certificate signed by unknown authority.
 // So you can set to true if you don't care about server's certificate.
-func (r *Request) InsecureSkipVerify(insecureSkipVerify bool) *Request {
-	r.insecureSkipVerify = insecureSkipVerify
+func (r *irequest) SetInsecureSkipVerify(insecureSkipVerify bool) Request {
+	r.InsecureSkipVerify = insecureSkipVerify
 
 	return r
 }
 
-func (r *Request) GetInsecureSkipVerify() bool {
-	return r.insecureSkipVerify
+func (r *irequest) GetInsecureSkipVerify() bool {
+	return r.InsecureSkipVerify
 }
 
 // Set SSL config, see tls.Config
-func (r *Request) TlsConfig(tlsConfig *tls.Config) *Request {
-	r.tlsConfig = tlsConfig
+func (r *irequest) SetTlsConfig(tlsConfig *tls.Config) Request {
+	r.TlsConfig = tlsConfig
 
 	return r
 }
 
-func (r *Request) GetTlsConfig() *tls.Config {
-	return r.tlsConfig
+func (r *irequest) GetTlsConfig() *tls.Config {
+	return r.TlsConfig
 }
 
-func (r *Request) Do() (*Response, error) {
+func (r *irequest) Do() (Response, error) {
 	m, err := NewMiddleware("request_exec")
 	if err != nil {
 		return nil, err
 	}
 
-	middleware := append(r.middleware, m)
+	ctx := NewContext(r.Context, r, nil)
 
-	return Compose(r.ctx, middleware, r)(r.ctx, r)
+	middleware := append(r.Middlewares, m)
+
+	err = Compose(ctx, middleware)(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctx.GetRes(), nil
 }

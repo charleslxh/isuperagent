@@ -10,4 +10,4 @@ go:
 os: osx
 
 script:
-  - go test -v
+  - go test test/isuperagent_test.go -v

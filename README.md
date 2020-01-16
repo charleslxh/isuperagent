@@ -9,8 +9,8 @@ isuperagent 是一个通用、灵活的 HTTP CLIENT 库，包装了请求、响�
 ```go
 timeMiddleware, err := isuperagent.NewMiddleware("request_time")
 basicAuthMiddleware, err := isuperagent.NewMiddleware("basic_auth", "username", "password")
-debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx context.Context, req *isuperagent.Request) {
-    log.Println(fmt.Sprintf("req headers: %+v", req.GetHeaders()))
+debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx isuperagent.Context) {
+    log.Println(fmt.Sprintf("req headers: %+v", ctx.GetReq().GetHeaders()))
 })
 
 res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(timeMiddleware, basicAuthMiddleware, debugMiddleware).Do()
@@ -52,36 +52,30 @@ go get github.com/charleslxh/isuperagent
 
 #### 如何自定义中间件
 
-1. 在 `util/isuperagent/middleware` 目录下新建中间件的 go 文件。
-
-    ```bash
-    $ touch your/path/xxxx_middleware.go 
-    ```
-
-2. 自定义中间件必须实现 `isuperagent.MiddlewareInterface` 接口。
+1. 自定义中间件必须实现 `isuperagent.Middleware` 签名。
 
     ```go
-   type MiddlewareInterface interface {   
-       Name() string       
-       Run(ctx context.Context, req *Request, next Next) (*Response, error)
+   func(ctx isuperagent.Context, next isuperagent.Next) error {
+       return nil
    }
     ```
 
 3. 中间件需要返回响应体和错误，如果你不关心，可以直接吞噬掉。
 
     ```go
-    func (m *XXXMiddleware) Run(ctx context.Context, req *Request, next Next) (*Response, error) {
+   func(ctx isuperagent.Context, next isuperagent.Next) error {
         mockRes := &Response{StatusCode: 404, StatusText: "Not Found"}
-        return mockRes, nil
+        ctx.SetRes(mockRes)
+   
+        return nil
     }
     ```
 
 4. 中间件提供 `next` 函数，用于调用下一个中间件，如果你不需要继续调用下一个中间件，则不需要调用该函数。
 
     ```go
-    func (m *XXXMiddleware) Run(ctx context.Context, req *Request, next Next) (*Response, error) {
-        res, err := next()
-        return res, err
+   func(ctx isuperagent.Context, next isuperagent.Next) error {
+        return next()
     }
     ```
 
@@ -91,27 +85,53 @@ go get github.com/charleslxh/isuperagent
 
 #### 中间件如何创建
 
-`isuperagent` 提供了中间件工厂方法，建议使用工厂模式创建中间件。 
+`isuperagent` 支持中间件本质上就是一个签名为 `func(ctx isuperagent.Context, next isuperagent.Next) error` 的函数，任何改签名的函数都能注入。
 
-1. 创建中间件注册工厂方法，工厂方法签名为 `type MiddlewareFactory func(v ...interface{}) (MiddlewareInterface, error)`，参考以下示例。
+```go
+func(ctx isuperagent.Context, next isuperagent.Next) error {
+    start := time.Now()
+    defer func() {
+    	duration := fmt.Sprintf("%s", time.Now().Sub(start))
+    	ctx.Set("request_time", duration)
+    	ctx.GetRes().GetHeaders().Set("X-SuperAgent-Duration", duration)
+    }()
+    
+    return next()
+}
+```
+
+**提示：可以参考现有的中间件工厂方法写法。**
+
+#### 如何为中间件绑定不同的参数
+
+`isuperagent` 提供了工厂方法来统一生产中间件，前提是必须向工厂注册你的中间件，`isuperagent` 内置一系列的中间件。
+
+1. 创建工厂方法，函数签名必须是 `func NewTimeMiddlewareFactory(v ...interface{}) (isuperagent.Middleware, error)`。
 
     ```go
-   type TimeMiddleware struct {
-   	headerName string
-   }
-   
-   func NewTimeMiddlewareFactory(v ...interface{}) (isuperagent.MiddlewareInterface, error) {
-   	if len(v) == 0 {
-   		return &TimeMiddleware{headerName: X_SUPERAGENT_DURATION}, nil
-   	}
-   
-   	if h, ok := v[0].(string); ok {
-   		return &TimeMiddleware{headerName: h}, nil
-   	}
-   
-   	return nil, errors.New(fmt.Sprintf("excepted header_name is string, but got %v(%s)", v[0], reflect.TypeOf(v[0])))
-   }
-    ```
+    // Middleware: record the request duration
+    func NewTimeMiddlewareFactory(v ...interface{}) (isuperagent.Middleware, error) {
+    	headerName := "x-SuperAgent-Duration"
+    	if len(v) > 0 {
+    		if h, ok := v[0].(string); ok {
+    			headerName = h
+    		} else {
+    			return nil, errors.New(fmt.Sprintf("excepted header_name is string, but got %v(%s)", v[0], reflect.TypeOf(v[0])))
+    		}
+    	}
+    
+    	return func(ctx isuperagent.Context, next isuperagent.Next) error {
+    		start := time.Now()
+    		defer func() {
+    			duration := fmt.Sprintf("%s", time.Now().Sub(start))
+    			ctx.Set("request_time", duration)
+    			ctx.GetRes().GetHeaders().Set("X-SuperAgent-Duration", duration)
+    		}()
+    
+    		return next()
+    	}, nil
+    }
+    ``` 
 
 2. 注册工厂方法，**工厂方法必须注册之后才能使用，配合 `init` 函数**。
 
@@ -125,6 +145,15 @@ go get github.com/charleslxh/isuperagent
 
     ```go
     middleware, err := isuperagent.NewMiddleware("request_time")
+   	if err != nil {
+   		return nil, err
+   	}
+    ```
+   
+    或者不使用 `isuperagent` 提供的统一工厂函数。
+   
+    ```go
+    middleware, err := NewTimeMiddlewareFactory()
    	if err != nil {
    		return nil, err
    	}
@@ -196,17 +225,19 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 2. 响应体的反序列化，需要手动调用，具体参考如下方式。
 
     ```go
+    type ResponeData struct {
+        Code int                 `json:"code"`
+        Msg  string              `json:"msg"`
+        Data map[string][]string `json:"data"`
+    }
+   
     res, err = isuperagent.NewRequest().Get("http://localhost:28080/v1/getHeader").Headers(headers).Do()
     if err != nil {
         return nil, err
     }
        
-    data := struct {
-        Code int                 `json:"code"`
-        Msg  string              `json:"msg"`
-        Data map[string][]string `json:"data"`
-    }{}
-    err = res.Body.Unmarshal(&data)
+    var data ResponeData
+    err = res.GetBody().Unmarshal(&data)
     if err != nil {
         return nil, err
     }
@@ -222,18 +253,18 @@ res, err := isuperagent.NewRequest().Get("http://localhost:8080/").Middleware(ti
 ```go
 res, err := isuperagent.NewRequest().
     Post("http://localhost:8080").
-    Header("a", "1").
-    Headers(map[string]string{
+    SetHeader("a", "1").
+    SetHeaders(map[string]string{
         "a": 2,
         "b": 3,
     }).
-    Query("token", "3ausdygiausyd1").
-    Queries(map[string]string{
+    SetQuery("token", "3ausdygiausyd1").
+    SetQueries(map[string]string{
         "key1": "v1",
         "key2": "v2",
     }).
-    Timeout(5 * time.Second).
-    Retry(5).
+    SetTimeout(5 * time.Second).
+    SetRetry(5).
     Middleware(middlewareA, middlewareB, middlewareC).
     Do()
 
@@ -257,19 +288,19 @@ return res, err
 2. 支持自签名服务器请求，忽略未知机构签发的证书（自签名）
 
     ```go
-    isuperagent.NewRequest().InsecureSkipVerify(true).Get("https://self-signed-cert-server.com")
+    isuperagent.NewRequest().SetInsecureSkipVerify(true).Get("https://self-signed-cert-server.com")
     ```
 
 3. 支持单向认证
 
     ```go
-    isuperagent.NewRequest().Ca("your/server_root_ca/path").Get("https://self-signed-cert-server.com")
+    isuperagent.NewRequest().SetCa("your/server_root_ca/path").Get("https://self-signed-cert-server.com")
     ```
 
 4. 支持双向认证
 
     ```go
-    isuperagent.NewRequest().Ca("your/server_root_ca/path").Cert("your/client_cert/path", "your/client_key/path").Get("https://self-signed-cert-server.com")
+    isuperagent.NewRequest().SetCa("your/server_root_ca/path").SetCert("your/client_cert/path", "your/client_key/path").Get("https://self-signed-cert-server.com")
     ```
 
 ### 请求出错重试
@@ -277,7 +308,7 @@ return res, err
 `isuperagent` 支持出错重试机制。
 
 ```go
-isuperagent.NewRequest().Get("http://unknown-server.com").Retry(3).Do()
+isuperagent.NewRequest().Get("http://unknown-server.com").SetRetry(3).Do()
 ```
 
 **注意：所有中间件只会触发一次，与重试次数无关。**

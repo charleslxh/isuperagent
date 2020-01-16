@@ -1,7 +1,6 @@
-package isuperagent_test
+package test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/charleslxh/isuperagent"
-	"github.com/charleslxh/isuperagent/middleware"
 )
 
 type ResponseData struct {
@@ -177,10 +175,10 @@ func TestSuperAgent_Request(t *testing.T) {
 		"c": "3",
 	}
 
-	res, err := isuperagent.NewRequest().Get("http://localhost:28080/getQuery").Queries(queries).Do()
+	res, err := isuperagent.NewRequest().Get("http://localhost:28080/getQuery").SetQueries(queries).Do()
 
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	data1 := struct {
@@ -188,7 +186,7 @@ func TestSuperAgent_Request(t *testing.T) {
 		Msg  string              `json:"msg"`
 		Data map[string][]string `json:"data"`
 	}{}
-	err = res.Body.Unmarshal(&data1)
+	err = res.GetBody().Unmarshal(&data1)
 	ast.Nil(err)
 	ast.Equal(map[string][]string{
 		"a": {"1"},
@@ -207,9 +205,9 @@ func TestSuperAgent_Request(t *testing.T) {
 		"cookie":          "_ga=GA1.2.242301321.1564383471; __utmc=110886291; __utmz=110886291.1578538723.31.21.utmcsr=google|utmccn=(organic)|utmcmd=organic|utmctr=(not%20provided); __utma=110886291.242301321.1564383471.1578538723.1578565071.32",
 		"user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36",
 	}
-	res, err = isuperagent.NewRequest().Get("http://localhost:28080/getHeader").Headers(headers).Do()
+	res, err = isuperagent.NewRequest().Get("http://localhost:28080/getHeader").SetHeaders(headers).Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	data2 := struct {
@@ -217,7 +215,7 @@ func TestSuperAgent_Request(t *testing.T) {
 		Msg  string              `json:"msg"`
 		Data map[string][]string `json:"data"`
 	}{}
-	err = res.Body.Unmarshal(&data2)
+	err = res.ParseBody(&data2)
 	ast.Nil(err)
 	ast.Equal(0, data2.Code)
 	ast.Equal("OK", data2.Msg)
@@ -229,23 +227,23 @@ func TestSuperAgent_Request(t *testing.T) {
 	// -----------------
 	// 验证 POST 请求
 	// -----------------
-	res, err = isuperagent.NewRequest().Post("http://localhost:28080/echo").Body("Hello World").Do()
+	res, err = isuperagent.NewRequest().Post("http://localhost:28080/echo").SetBody("Hello World").Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	var data3 string
-	err = res.Body.Unmarshal(&data3)
+	err = res.GetBody().Unmarshal(&data3)
 	ast.Nil(err)
 	ast.Equal("Hello World", data3)
 
 	res, err = isuperagent.NewRequest().Post("http://localhost:28080/echo", "Hello World Golang").Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	var data4 string
-	err = res.Body.Unmarshal(&data4)
+	err = res.GetBody().Unmarshal(&data4)
 	ast.Nil(err)
 	ast.Equal("Hello World Golang", data4)
 }
@@ -262,11 +260,11 @@ func TestSuperAgent_HttpsRequest(t *testing.T) {
 	res, err := isuperagent.NewRequest().Get("https://www.baidu.com").Do()
 
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	var html string
-	err = res.Body.Unmarshal(&html)
+	err = res.GetBody().Unmarshal(&html)
 	ast.Nil(err)
 
 	// -------------------
@@ -276,12 +274,12 @@ func TestSuperAgent_HttpsRequest(t *testing.T) {
 	ast.NotNil(err)
 	ast.Equal("Get https://localhost:2443/: x509: certificate signed by unknown authority", err.Error())
 
-	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").InsecureSkipVerify(true).Do()
+	res, err = isuperagent.NewRequest().Get("https://localhost:2443/").SetInsecureSkipVerify(true).Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
-	err = res.Body.Unmarshal(&html)
+	err = res.GetBody().Unmarshal(&html)
 	ast.Nil(err)
 	ast.Equal("Hello world HTTPS", html)
 
@@ -305,14 +303,14 @@ func TestSuperAgent_RequestTimeMiddleware(t *testing.T) {
 
 	res, err := isuperagent.NewRequest().Get("http://localhost:28080/").Middleware(timeMiddleware).Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 
 	var data string
-	err = res.Body.Unmarshal(&data)
+	err = res.GetBody().Unmarshal(&data)
 	ast.Nil(err)
 	ast.Equal("Hello world", data)
-	ast.NotEqual("0", res.Headers.Get(middleware.X_SUPERAGENT_DURATION))
+	ast.NotEqual("0", res.GetHeaders().Get("X-SuperAgent-Duration"))
 }
 
 func TestSuperAgent_Middleware(t *testing.T) {
@@ -342,10 +340,10 @@ func TestSuperAgent_Middleware(t *testing.T) {
 	basicAuthMiddleware, err = isuperagent.NewMiddleware("basic_auth", "MTIzNDU2", "YXNkZmdoamts")
 	ast.Nil(err)
 
-	debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx context.Context, req *isuperagent.Request) {
-		ast.Equal(isuperagent.Method_GET, req.GetMethod())
-		ast.NotEqual(0, len(req.GetHeader(middleware.BASIC_AUTH_HEADER)))
-		log.Println(fmt.Sprintf("req headers: %+v", req.GetHeaders()))
+	debugMiddleware, err := isuperagent.NewMiddleware("debug", func(ctx isuperagent.Context) {
+		ast.Equal(isuperagent.Method_GET, ctx.GetReq().GetMethod())
+		ast.NotEqual(0, len(ctx.GetReq().GetHeader("Authorization")))
+		log.Println(fmt.Sprintf("req headers: %+v", ctx.GetReq().GetHeaders()))
 	})
 	ast.Nil(err)
 
@@ -353,6 +351,6 @@ func TestSuperAgent_Middleware(t *testing.T) {
 		Middleware(timeMiddleware, basicAuthMiddleware, debugMiddleware).
 		Do()
 	ast.Nil(err)
-	ast.Equal(200, res.StatusCode)
+	ast.Equal(200, res.GetStatusCode())
 	ast.True(res.IsOk())
 }

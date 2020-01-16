@@ -7,8 +7,16 @@ import (
 	"github.com/charleslxh/isuperagent/bodyParser"
 )
 
-type ResponseInterface interface {
+type Response interface {
 	IsOk() bool
+	GetHeaders() http.Header
+	GetBody() *Body
+	ParseBody(v interface{}) error
+	GetStatusCode() int
+	GetStatusText() string
+
+	GetHttpRequest() *http.Request
+	GetHttpResponse() *http.Response
 }
 
 type BodyInterface interface {
@@ -16,7 +24,7 @@ type BodyInterface interface {
 	Unmarshal(v interface{}) error
 }
 
-type Response struct {
+type iresponse struct {
 	StatusCode int
 	StatusText string
 	Body       *Body
@@ -44,8 +52,8 @@ func (b *Body) Unmarshal(v interface{}) error {
 	return nil
 }
 
-func NewResponse(req *http.Request, resp *http.Response) (*Response, error) {
-	res := &Response{}
+func NewResponse(req *http.Request, resp *http.Response) (Response, error) {
+	res := &iresponse{}
 
 	res.StatusCode = resp.StatusCode
 	res.StatusText = resp.Status
@@ -64,6 +72,34 @@ func NewResponse(req *http.Request, resp *http.Response) (*Response, error) {
 	return res, nil
 }
 
-func (r *Response) IsOk() bool {
+func (r *iresponse) IsOk() bool {
 	return r.StatusCode == 200
+}
+
+func (r *iresponse) GetHeaders() http.Header {
+	return r.Headers
+}
+
+func (r *iresponse) GetBody() *Body {
+	return r.Body
+}
+
+func (r *iresponse) ParseBody(v interface{}) error {
+	return r.Body.Unmarshal(v)
+}
+
+func (r *iresponse) GetStatusCode() int {
+	return r.StatusCode
+}
+
+func (r *iresponse) GetStatusText() string {
+	return r.StatusText
+}
+
+func (r *iresponse) GetHttpRequest() *http.Request {
+	return r.HttpReq
+}
+
+func (r *iresponse) GetHttpResponse() *http.Response {
+	return r.HttpResp
 }
